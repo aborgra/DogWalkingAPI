@@ -1,0 +1,1 @@
+﻿SELECT o.Id, o.Name, o.NeighborhoodId, o.Phone, o.Address, n.Name as 'Neighborhood Name', d.Id as 'Dog Id', d.Name as 'Dog Name', d.breed, d.notes, d.OwnerId as 'Owner Id' FROM Owner o LEFT JOIN Neighborhood n on o.NeighborhoodId = n.Id LEFT JOIN Dog d on o.id = d.OwnerId
