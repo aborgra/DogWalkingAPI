@@ -79,42 +79,66 @@ namespace DogWalkingAPI.Controllers
         }
 
         [HttpGet("{id}", Name = "GetWalker")]
-        public async Task<IActionResult> Get([FromRoute] int id)
+        public async Task<IActionResult> Get([FromRoute] int id,
+            [FromQuery]string include)
         {
             using (SqlConnection conn = Connection)
             {
                 conn.Open();
                 using (SqlCommand cmd = conn.CreateCommand())
                 {
-                    cmd.CommandText = "SELECT w.Id, w.Name, w.NeighborhoodId, n.Name as 'Neighborhood Name' FROM Walker w LEFT JOIN Neighborhood n on w.NeighborhoodId = n.Id WHERE n.Id = @id";
+                    cmd.CommandText = @"SELECT w.Id, w.Name, w.NeighborhoodId, n.Name as 'Neighborhood Name' ";
+                    if (include == "walks")
+                    {
+                        cmd.CommandText += ", wks.Id as WalksId, wks.Date, wks.Duration, wks.WalkerId, wks.DogId";
+                    }
+
+                   cmd.CommandText += " FROM Walker w ";
+
+                    if(include == "walks")
+                    {
+                        cmd.CommandText += " AND LEFT JOIN Walks wks on wks.WalkerId = w.Id";
+                    }
+
+                    cmd.CommandText += "LEFT JOIN Neighborhood n on w.NeighborhoodId = n.Id WHERE w.Id = @id";
+
                     cmd.Parameters.Add(new SqlParameter("@id", id));
                     SqlDataReader reader = cmd.ExecuteReader();
 
-                    Walker newWalker = new Walker();
+                    Walker walker = null;
 
-                    if (reader.Read())
+                    while (reader.Read())
                     {
-                        int idColumnPosition = reader.GetOrdinal("Id");
-                        int IdValue = reader.GetInt32(idColumnPosition);
-
-                        int NameColumnPosition = reader.GetOrdinal("Name");
-                        string NameValue = reader.GetString(NameColumnPosition);
-
-                        int neighborhoodIdColumnPosition = reader.GetOrdinal("neighborhoodId");
-                        int neighborhoodIdValue = reader.GetInt32(neighborhoodIdColumnPosition);
-
-                        newWalker = new Walker
+                        if (walker == null)
                         {
-                            Id = IdValue,
-                            Name = NameValue,
-                            NeighborhoodId = neighborhoodIdValue,
-                            Neighborhood = null,
-                            Walks = null
-                        };
+                            walker = new Walker
+                            {
+                                Id = reader.GetInt32(reader.GetOrdinal("Id")),
+                                Name = reader.GetString(reader.GetOrdinal("Name")),
+                                NeighborhoodId = reader.GetInt32(reader.GetOrdinal("neighborhoodId")),
+                                Neighborhood = new Neighborhood
+                                {
+                                    Name = reader.GetString(reader.GetOrdinal("Neighborhood Name"))
+                                },
+                                Walks = new List<Walk>()
+                             };
+                        }
+                        if(include == "walks")
+                        {
+                            walker.Walks.Add(new Walk()
+                            {
+                                Id = reader.GetInt32(reader.GetOrdinal("WalksId")),
+                                Date = reader.GetDateTime(reader.GetOrdinal("Date")),
+                                Duration = reader.GetInt32(reader.GetOrdinal("Duration")),
+                                WalkerId = reader.GetInt32(reader.GetOrdinal("WalkerId")),
+                                DogId = reader.GetInt32(reader.GetOrdinal("WalkerId"))
+                            });
+                        }
+                       
                     }
 
                     reader.Close();
-                    return Ok(newWalker);
+                    return Ok(walker);
                 }
             }
         }
