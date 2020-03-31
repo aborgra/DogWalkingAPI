@@ -14,7 +14,7 @@ namespace DogWalkingAPI.Models
 
         public Neighborhood Neighborhood { get; set; }
 
-        public List<Walk> Walks = new List<Walk>();
+        public List<Walk> Walks { get; set; }
 
     }
 }

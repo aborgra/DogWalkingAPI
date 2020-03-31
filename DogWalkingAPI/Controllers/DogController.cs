@@ -32,7 +32,7 @@ namespace DogWalkingAPI.Controllers
             }
 
         [HttpGet]
-        public async Task<IActionResult> Get()
+        public async Task<IActionResult> Get([FromQuery] int? neighborhoodId)
         {
             using (SqlConnection conn = Connection)
             {
@@ -41,52 +41,37 @@ namespace DogWalkingAPI.Controllers
                 using SqlCommand cmd = conn.CreateCommand();
                 List<Dog> dogs = new List<Dog>();
 
-                cmd.CommandText = @"SELECT d.Id, d.Name, d.OwnerId, d.Breed, d.Notes, o.Id as 'Owner Id', o.Name as 'Owner Name', o.NeighborhoodId 
+                cmd.CommandText = @"SELECT d.Id, d.Name, d.OwnerId, d.Breed, d.Notes, o.Id as 'Owner Id', o.Name as 'Owner Name', o.NeighborhoodId, o.Address, o.Phone 
                                     FROM Dog d 
                                     LEFT JOIN Owner o 
-                                    on d.OwnerId = o.Id";
+                                    on d.OwnerId = o.Id ";
+
+                if (neighborhoodId != null)
+                {
+                    cmd.CommandText += " WHERE neighborhoodId = @neighborhoodId";
+                    cmd.Parameters.Add(new SqlParameter("@neighborhoodId", neighborhoodId));
+                }
+
                 SqlDataReader reader = cmd.ExecuteReader();
 
                 Dog newDog = null;
                 while (reader.Read())
-                {
-
-                    int idColumnPosition = reader.GetOrdinal("Id");
-                    int idValue = reader.GetInt32(idColumnPosition);
-
-                    int nameColumnPosition = reader.GetOrdinal("Name");
-                    string nameValue = reader.GetString(nameColumnPosition);
-
-                    int ownerIdColumnPosition = reader.GetOrdinal("OwnerId");
-                    int ownerIdValue = reader.GetInt32(ownerIdColumnPosition);
-
-                    int breedColumnPosition = reader.GetOrdinal("Breed");
-                    string breedValue = reader.GetString(breedColumnPosition);
-
-                    int notesColumnPosition = reader.GetOrdinal("Notes");
-                    string notesValue = reader.GetString(notesColumnPosition);
-
-                    int oIdColumnPosition = reader.GetOrdinal("Owner Id");
-                    int oIdValue = reader.GetInt32(oIdColumnPosition);
-
-                    int ownerColumnPosition = reader.GetOrdinal("Owner Name");
-                    string ownerValue = reader.GetString(ownerColumnPosition);
-
-                    int nIdColumnPosition = reader.GetOrdinal("NeighborhoodId");
-                    int nIdValue = reader.GetInt32(nIdColumnPosition);
+                { 
 
                     newDog = new Dog
                     {
-                        Name = nameValue,
-                        Id = idValue,
-                        OwnerId = ownerIdValue,
-                        Breed = breedValue,
-                        Notes = notesValue,
+                        Name = reader.GetString(reader.GetOrdinal("Name")),
+                        Id = reader.GetInt32(reader.GetOrdinal("Id")),
+                        OwnerId = reader.GetInt32(reader.GetOrdinal("OwnerId")),
+                        Breed = reader.GetString(reader.GetOrdinal("Breed")),
+                        Notes = reader.GetString(reader.GetOrdinal("Notes")),
                         Owner = new Owner()
                         {
-                            Id = oIdValue,
-                            Name = ownerValue,
-                            NeighborhoodId = nIdValue
+                            Id = reader.GetInt32(reader.GetOrdinal("OwnerId")),
+                            Name = reader.GetString(reader.GetOrdinal("Owner Name")),
+                            NeighborhoodId = reader.GetInt32(reader.GetOrdinal("NeighborhoodId")),
+                            Address = reader.GetString(reader.GetOrdinal("Address")),
+                            Phone = reader.GetString(reader.GetOrdinal("Phone"))
                         }
 
                     };

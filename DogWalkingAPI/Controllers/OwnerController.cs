@@ -31,100 +31,163 @@ namespace DogWalkingAPI.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> Get()
+        public async Task<IActionResult> Get([FromQuery] string include, [FromQuery] string q)
         {
             using (SqlConnection conn = Connection)
             {
                 conn.Open();
 
                 using SqlCommand cmd = conn.CreateCommand();
-                cmd.CommandText = @"SELECT o.Id, o.Name, o.NeighborhoodId, o.Phone, o.Address, n.Name as 'Neighborhood Name', d.Id as 'Dog Id', d.Name as 'Dog Name', d.breed, d.notes, d.OwnerId as 'Owner Id' FROM Owner o LEFT JOIN Neighborhood n on o.NeighborhoodId = n.Id LEFT JOIN Dog d on o.id = d.OwnerId";
+                {
+                var includeQuery = "";
+                var joinQuery = "";
+                if (include == "neighborhood")
+                {
+                    includeQuery = " n.Name as 'Neighborhood Name', ";
+                    joinQuery = " LEFT JOIN Neighborhood N ON o.NeighborhoodId = n.Id ";
+
+                }
+                cmd.CommandText = $@"SELECT o.Id, o.Name, o.NeighborhoodId, o.Phone, o.Address, 
+                                    {includeQuery}d.Id as 'Dog Id', d.Name as 'Dog Name', d.breed, d.notes, d.OwnerId as 'Owner Id' 
+                                    FROM Owner o 
+                                    {joinQuery} 
+                                    LEFT JOIN Dog d on o.id = d.OwnerId";
+                if (q != null)
+                {
+                    cmd.CommandText += " WHERE o.Name LIKE @Name";
+                    cmd.Parameters.Add(new SqlParameter("@Name", "%" + q + "%"));
+                }
+
                 SqlDataReader reader = cmd.ExecuteReader();
 
                 List<Owner> owners = new List<Owner>();
-               
+
 
                 while (reader.Read())
                 {
-                    int idColumnPosition = reader.GetOrdinal("Id");
-                    int idValue = reader.GetInt32(idColumnPosition);
+                    int idValue = reader.GetInt32(reader.GetOrdinal("Id"));
+                    var existingOwner = owners.FirstOrDefault(o => o.Id == idValue);
 
-                    var existingOwner = owners.FirstOrDefault(o => o.Id == idValue );
-                    if (existingOwner == null)
+                    if (include == "neighborhood")
                     {
 
-                        int nameColumnPosition = reader.GetOrdinal("Name");
-                        string nameValue = reader.GetString(nameColumnPosition);
-
-                        int phoneColumnPosition = reader.GetOrdinal("Phone");
-                        string phoneValue = reader.GetString(phoneColumnPosition);
-
-                        int addressColumnPosition = reader.GetOrdinal("Address");
-                        string addressValue = reader.GetString(addressColumnPosition);
-
-                        int neighborhoodIdColumnPosition = reader.GetOrdinal("NeighborhoodId");
-                        int neighborhoodIdValue = reader.GetInt32(neighborhoodIdColumnPosition);
-
-                        int neighborhoodColumnPosition = reader.GetOrdinal("Neighborhood Name");
-                        string neighborhoodValue = reader.GetString(neighborhoodColumnPosition);
-                   
-                       Owner owner = new Owner()
+                        if (existingOwner == null)
                         {
-                            Id = idValue,
-                            Name = nameValue,
-                            Phone = phoneValue,
-                            Address = addressValue,
-                            NeighborhoodId = neighborhoodIdValue,
-                            Neighborhood = new Neighborhood
+
+                            Owner owner = new Owner()
                             {
-                                Name = neighborhoodValue,
-                                Id = neighborhoodIdValue
-                            },
-                            Dogs = new List<Dog>()
+                                Id = idValue,
+                                Name = reader.GetString(reader.GetOrdinal("Name")),
+                                Phone = reader.GetString(reader.GetOrdinal("Phone")),
+                                Address = reader.GetString(reader.GetOrdinal("Address")),
+                                NeighborhoodId = reader.GetInt32(reader.GetOrdinal("NeighborhoodId")),
+                                Neighborhood = new Neighborhood
+                                {
+                                    Name = reader.GetString(reader.GetOrdinal("Neighborhood Name")),
+                                    Id = reader.GetInt32(reader.GetOrdinal("NeighborhoodId"))
+                                },
+                                Dogs = new List<Dog>()
 
-                        };
-                        owner.Dogs.Add(new Dog()
+                            };
+                            owner.Dogs.Add(new Dog()
+                            {
+                                Name = reader.GetString(reader.GetOrdinal("Dog Name")),
+                                Id = reader.GetInt32(reader.GetOrdinal("Dog Id")),
+                                Breed = reader.GetString(reader.GetOrdinal("Breed")),
+                                Notes = reader.GetString(reader.GetOrdinal("Notes")),
+                                OwnerId = reader.GetInt32(reader.GetOrdinal("Owner Id"))
+
+                            });
+
+                            owners.Add(owner);
+                        }
+                        else
                         {
-                            Name = reader.GetString(reader.GetOrdinal("Dog Name")),
-                            Id = reader.GetInt32(reader.GetOrdinal("Dog Id")),
-                            Breed = reader.GetString(reader.GetOrdinal("Breed")),
-                            Notes = reader.GetString(reader.GetOrdinal("Notes")),
-                            OwnerId = reader.GetInt32(reader.GetOrdinal("Owner Id"))
 
-                        });
+                            existingOwner.Dogs.Add(new Dog()
+                            {
+                                Name = reader.GetString(reader.GetOrdinal("Dog Name")),
+                                Id = reader.GetInt32(reader.GetOrdinal("Dog Id")),
+                                Breed = reader.GetString(reader.GetOrdinal("Breed")),
+                                Notes = reader.GetString(reader.GetOrdinal("Notes")),
+                                OwnerId = reader.GetInt32(reader.GetOrdinal("Owner Id"))
 
-                        owners.Add(owner);
-                    }else
-                    {
-
-                        existingOwner.Dogs.Add(new Dog()
-                        {
-                            Name = reader.GetString(reader.GetOrdinal("Dog Name")),
-                            Id = reader.GetInt32(reader.GetOrdinal("Dog Id")),
-                            Breed = reader.GetString(reader.GetOrdinal("Breed")),
-                            Notes = reader.GetString(reader.GetOrdinal("Notes")),
-                            OwnerId = reader.GetInt32(reader.GetOrdinal("Owner Id"))
-
-                        });
+                            });
+                        }
                     }
-                  
+                    else
+                    {
+                        if (existingOwner == null)
+                        {
+
+                            Owner owner = new Owner()
+                            {
+                                Id = idValue,
+                                Name = reader.GetString(reader.GetOrdinal("Name")),
+                                Phone = reader.GetString(reader.GetOrdinal("Phone")),
+                                Address = reader.GetString(reader.GetOrdinal("Address")),
+                                NeighborhoodId = reader.GetInt32(reader.GetOrdinal("NeighborhoodId")),
+                                Dogs = new List<Dog>()
+
+                            };
+                            owner.Dogs.Add(new Dog()
+                            {
+                                Name = reader.GetString(reader.GetOrdinal("Dog Name")),
+                                Id = reader.GetInt32(reader.GetOrdinal("Dog Id")),
+                                Breed = reader.GetString(reader.GetOrdinal("Breed")),
+                                Notes = reader.GetString(reader.GetOrdinal("Notes")),
+                                OwnerId = reader.GetInt32(reader.GetOrdinal("Owner Id"))
+
+                            });
+
+                            owners.Add(owner);
+                        }
+                        else
+                        {
+
+                            existingOwner.Dogs.Add(new Dog()
+                            {
+                                Name = reader.GetString(reader.GetOrdinal("Dog Name")),
+                                Id = reader.GetInt32(reader.GetOrdinal("Dog Id")),
+                                Breed = reader.GetString(reader.GetOrdinal("Breed")),
+                                Notes = reader.GetString(reader.GetOrdinal("Notes")),
+                                OwnerId = reader.GetInt32(reader.GetOrdinal("Owner Id"))
+
+                            });
+                        }
+                    }
+
                 }
-                
+
                 reader.Close();
                 return Ok(owners);
             }
         }
+        }
         
 
         [HttpGet("{id}", Name = "GetOwner")]
-        public async Task<IActionResult> Get([FromRoute] int id)
+        public async Task<IActionResult> Get([FromRoute] int id, [FromQuery] string include)
         {
             using (SqlConnection conn = Connection)
             {
                 conn.Open();
                 using (SqlCommand cmd = conn.CreateCommand())
                 {
-                    cmd.CommandText = "SELECT o.Id, o.Name, o.NeighborhoodId, o.Phone, o.Address, n.Name as 'Neighborhood Name', d.Id as 'Dog Id', d.Name as 'Dog Name', d.breed, d.notes, d.OwnerId FROM Owner o LEFT JOIN Neighborhood n on o.NeighborhoodId = n.Id LEFT JOIN Dog d on o.id = d.OwnerId WHERE o.Id = @id";
+                    var paramQuery = "";
+                    var fromQuery = "";
+                    if (include == "neighborhood")
+                    {
+                        paramQuery = " n.Name NeighborhoodName,";
+                        fromQuery = "Left Join  Neighborhood n On o.NeighborhoodId = n.Id";
+                    }
+                    cmd.CommandText = $@"SELECT o.Id, o.Name, o.Address, o.NeighborhoodId, o.Phone,{paramQuery} d.Id DogId ,d.Name DogName, d.Breed, d.Notes, d.OwnerId
+                        FROM Owner o
+                        {fromQuery}
+                        Left Join Dog d
+                        On o.Id = d.OwnerId
+                        Where o.Id = @id";
+
                     cmd.Parameters.Add(new SqlParameter("@id", id));
                     SqlDataReader reader = cmd.ExecuteReader();
 

@@ -30,14 +30,26 @@ namespace DogWalkingAPI.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> Get()
+        public async Task<IActionResult> Get([FromQuery] int? neighborhoodId)
         {
             using (SqlConnection conn = Connection)
             {
                 conn.Open();
 
                 using SqlCommand cmd = conn.CreateCommand();
-                cmd.CommandText = "SELECT w.Id, w.Name, w.NeighborhoodId, n.id as 'Neighborhood Id', n.Name as 'Neighborhood Name' FROM Walker w LEFT JOIN Neighborhood n on w.NeighborhoodId = n.Id";
+                cmd.CommandText = "SELECT w.Id, w.Name, w.NeighborhoodId, ";
+                if(neighborhoodId != null)
+                {
+                    cmd.CommandText += "n.id as 'Neighborhood Id', n.Name as 'Neighborhood Name'";
+                }
+                
+                cmd.CommandText += "FROM Walker w LEFT JOIN Neighborhood n on w.NeighborhoodId = n.Id";
+
+                if (neighborhoodId != null)
+                {
+                    cmd.CommandText += " WHERE neighborhoodId = @neighborhoodId";
+                    cmd.Parameters.Add(new SqlParameter("@neighborhoodId", neighborhoodId));
+                }
                 SqlDataReader reader = cmd.ExecuteReader();
 
                 List<Walker> walkers = new List<Walker>();
@@ -45,29 +57,15 @@ namespace DogWalkingAPI.Controllers
                 while (reader.Read())
                 {
 
-                    int idColumnPosition = reader.GetOrdinal("Id");
-                    int idValue = reader.GetInt32(idColumnPosition);
-
-                    int nameColumnPosition = reader.GetOrdinal("Name");
-                    string nameValue = reader.GetString(nameColumnPosition);
-
-                    int neighborhoodColumnPosition = reader.GetOrdinal("NeighborhoodId");
-                    int neighborhoodValue = reader.GetInt32(neighborhoodColumnPosition);
-
-                    int neighborhoodNameColumnPosition = reader.GetOrdinal("Neighborhood Name");
-                    string neighborhoodNameValue = reader.GetString(neighborhoodNameColumnPosition);
-                    int nIdColumnPosition = reader.GetOrdinal("Neighborhood Id");
-                    int nIdValue = reader.GetInt32(nIdColumnPosition);
-
                     Walker walker = new Walker
                     {
-                        Id = idValue,
-                        Name = nameValue,
-                        NeighborhoodId = neighborhoodValue,
+                        Id = reader.GetInt32(reader.GetOrdinal("Id")),
+                        Name = reader.GetString(reader.GetOrdinal("Name")),
+                        NeighborhoodId = reader.GetInt32(reader.GetOrdinal("NeighborhoodId")),
                         Neighborhood = new Neighborhood
                         {
-                            Name = neighborhoodNameValue,
-                            Id = nIdColumnPosition 
+                            Name = reader.GetString(reader.GetOrdinal("Neighborhood Name")),
+                            Id = reader.GetInt32(reader.GetOrdinal("NeighborhoodId"))
                         }
                     };
 
@@ -88,16 +86,17 @@ namespace DogWalkingAPI.Controllers
                 using (SqlCommand cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = @"SELECT w.Id, w.Name, w.NeighborhoodId, n.Name as 'Neighborhood Name' ";
+
                     if (include == "walks")
                     {
-                        cmd.CommandText += ", wks.Id as WalksId, wks.Date, wks.Duration, wks.WalkerId, wks.DogId";
+                        cmd.CommandText += ", wks.Id as WalksId, wks.Date, wks.Duration, wks.WalkerId as WalkerId, wks.DogId as DogId";
                     }
 
                    cmd.CommandText += " FROM Walker w ";
 
                     if(include == "walks")
                     {
-                        cmd.CommandText += " AND LEFT JOIN Walks wks on wks.WalkerId = w.Id";
+                        cmd.CommandText += " LEFT JOIN Walks wks on w.Id = wks.WalkerId ";
                     }
 
                     cmd.CommandText += "LEFT JOIN Neighborhood n on w.NeighborhoodId = n.Id WHERE w.Id = @id";
@@ -131,7 +130,7 @@ namespace DogWalkingAPI.Controllers
                                 Date = reader.GetDateTime(reader.GetOrdinal("Date")),
                                 Duration = reader.GetInt32(reader.GetOrdinal("Duration")),
                                 WalkerId = reader.GetInt32(reader.GetOrdinal("WalkerId")),
-                                DogId = reader.GetInt32(reader.GetOrdinal("WalkerId"))
+                                DogId = reader.GetInt32(reader.GetOrdinal("DogId"))
                             });
                         }
                        
